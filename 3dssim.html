@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radiation vs Spacesuit Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: sans-serif; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .legend { margin-top: 10px; }
+        .alpha { color: #ff4444; }
+        .beta { color: #44ff44; }
+        .gamma { color: #4444ff; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h2>Radiation Shielding Simulation</h2>
+    <p>Visualizing particle penetration on a suit fabric cross-section.</p>
+    <div class="legend">
+        <b class="alpha">● Alpha:</b> High mass, low penetration (Stopped by surface)<br>
+        <b class="beta">● Beta:</b> Low mass, medium penetration (Stopped by inner layers)<br>
+        <b class="gamma">● Gamma:</b> No mass, high penetration (Passes through)
+    </div>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // --- Scene Setup ---
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 5, 5).normalize();
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // --- The "Spacesuit" Object ---
+    // Represented as three layers of varying density
+    const layerGeometry = new THREE.BoxGeometry(0.5, 6, 6);
+    
+    // Layer 1: Outer Nylon/Kevlar
+    const layer1 = new THREE.Mesh(layerGeometry, new THREE.MeshPhongMaterial({ color: 0xeeeeee, transparent: true, opacity: 0.6 }));
+    layer1.position.x = 2;
+    scene.add(layer1);
+
+    // Layer 2: Thermal Insulation
+    const layer2 = new THREE.Mesh(layerGeometry, new THREE.MeshPhongMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.4 }));
+    layer2.position.x = 3;
+    scene.add(layer2);
+
+    // Layer 3: Pressure Bladder
+    const layer3 = new THREE.Mesh(layerGeometry, new THREE.MeshPhongMaterial({ color: 0x888888, transparent: true, opacity: 0.2 }));
+    layer3.position.x = 4;
+    scene.add(layer3);
+
+    // --- Particle Logic ---
+    const particles = [];
+    const particleTypes = {
+        ALPHA: { color: 0xff4444, size: 0.15, speed: 0.05, penetration: 2.1 }, // Stops at Layer 1
+        BETA:  { color: 0x44ff44, size: 0.05, speed: 0.12, penetration: 3.5 }, // Stops at Layer 2/3
+        GAMMA: { color: 0x4444ff, size: 0.02, speed: 0.20, penetration: 10.0 } // Passes through
+    };
+
+    function spawnParticle() {
+        const keys = Object.keys(particleTypes);
+        const type = particleTypes[keys[Math.floor(Math.random() * keys.length)]];
+        
+        const geometry = new THREE.SphereGeometry(type.size, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ color: type.color });
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        mesh.position.set(-10, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+        
+        scene.add(mesh);
+        particles.push({ mesh, type });
+    }
+
+    camera.position.set(0, 5, 10);
+    camera.lookAt(2, 0, 0);
+
+    // --- Animation Loop ---
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (Math.random() > 0.9) spawnParticle();
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.mesh.position.x += p.type.speed;
+
+            // Collision/Absorption Logic
+            if (p.mesh.position.x > p.type.penetration) {
+                // If it's not Gamma, it gets absorbed (disappears)
+                if (p.type !== particleTypes.GAMMA) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+            }
+
+            // Cleanup distant particles
+            if (p.mesh.position.x > 15) {
+                scene.remove(p.mesh);
+                particles.splice(i, 1);
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+</body>
+</html>
